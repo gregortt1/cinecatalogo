@@ -8,6 +8,9 @@
 <meta name="referrer" content="no-referrer">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
+<link rel="preconnect" href="https://api.mdblist.com" crossorigin>
+<link rel="preconnect" href="https://www.omdbapi.com" crossorigin>
+<link rel="preconnect" href="https://api.trakt.tv" crossorigin>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://image.tmdb.org data:; connect-src https://api.themoviedb.org https://www.omdbapi.com https://api.mdblist.com https://api.trakt.tv; base-uri 'none'; form-action 'none'">
 <title>CineCatálogo · Watchlist + Trakt</title>
 <script>
@@ -18,6 +21,17 @@ try {
 } catch (e) {}
 </script>
 <style>
+  .seeded-badge {
+    color: #FFD700;
+    font-weight: 900;
+    margin-left: 4px;
+  }
+  .seeded-hero-badge {
+    color: #FFD700;
+    font-weight: 900;
+    margin-left: 8px;
+    font-size: 0.9em;
+  }
   :root {
     --bg: #0b0d12; --bg-soft: #0f1219; --surface: #14171f; --surface-2: #1c2029;
     --border: #2a2f3a; --border-soft: #222631;
@@ -1761,6 +1775,64 @@ try {
     const votesTxt = imdbVotes ? ' · ' + numFmt.format(imdbVotes) + ' votos' : '';
     let badge = '';
     if (imdbScore) {
+      let badgeClass = 'imdb';
+      let badgeText = 'IMDb ' + imdbScore;
+      const source = imdbInfo && imdbInfo.source;
+      // Check if movie comes from catalog source (seed)
+      if (source === 'catalog') {
+        // Add a small badge indicating it's from the weekly IMDb top
+        badge = '<span class="badge badge-main imdb" data-score="' + id + '" data-tmdb="' + tmdbScore + '" title="IMDb ' + imdbScore + ' · Top semanal de IMDb">IMDb ' + imdbScore + ' <span class="seeded-badge">★</span></span>';
+      } else {
+        badge = '<span class="badge badge-main imdb" data-score="' + id + '" data-tmdb="' + tmdbScore + '" title="IMDb ' + imdbScore + '">IMDb ' + imdbScore + '</span>';
+      }
+    } else if (tmdbScore) {
+      badge = '<span class="badge badge-main tmdb" data-score="' + id + '" data-tmdb="' + tmdbScore + '" title="TMDb ' + tmdbScore + (S.omdb ? ' · cargando IMDb…' : '') + '"><span class="star">★</span> ' + tmdbScore + '</span>';
+    }
+
+    const meta = [year || '—', imdbScore && tmdbScore ? 'TMDb ' + tmdbScore : ''].filter(Boolean).join(' · ');
+
+    return '<article class="card" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr(title) + '">' +
+      '<div class="poster">' +
+        (poster
+          ? '<img src="' + poster + '"' + (srcset ? ' srcset="' + srcset + '" sizes="(max-width: 520px) 44vw, (max-width: 900px) 30vw, 210px"' : '') +
+            ' alt="" loading="' + (eager ? 'eager' : 'lazy') + '" decoding="async" fetchpriority="' + (eager ? 'high' : 'auto') +
+            '" referrerpolicy="no-referrer" width="342" height="513">'
+          : '<div class="no-poster">Sin póster</div>') +
+        badge +
+        '<button class="fav' + (saved ? ' on' : '') + '" data-fav="' + id + '" aria-pressed="' + saved + '"' +
+          ' aria-label="' + (saved ? 'Quitar de la watchlist' : 'Añadir a la watchlist') + '">' + (saved ? '♥' : '♡') + '</button>' +
+        '<div class="card-body"><h2>' + esc(title) + '</h2><div class="meta">' + meta + '</div></div>' +
+      '</div>' +
+      '<div class="card-info">' +
+        '<div class="ratings">' +
+          '<button class="ratings-toggle" aria-expanded="false">Ver</button>' +
+          '<div class="ratings-grid">' +
+            '<div class="rating-card muted"><span class="spinner"></span> Cargando puntuaciones.</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</article>';
+  }
+    const id = Number(m.id);
+    const title = m.title || ('Película #' + id);
+    const year = (m.release_date || '').slice(0, 4);
+    const poster = imgUrl('w342', m.poster_path);
+    const srcset = posterSrcset(m.poster_path);
+    const eager = index < 4;
+    const tmdbScore = m.vote_average ? Number(m.vote_average).toFixed(1) : '';
+    const saved = watchMap.has(id);
+    const watched = trakt.loaded && trakt.watched.has(id);
+    const mine = trakt.loaded ? trakt.ratings.get(id) : 0;
+
+    // La puntuación principal es la de IMDb. Mientras OMDb responde se muestra
+    // la de TMDb, que se sustituye sola al llegar (ver applyImdb).
+    const imdbInfo = imdbInfoOf(id);
+    const imdbRating = imdbInfo && imdbInfo.via === 'id' ? imdbInfo.rating : null;
+    const imdbScore = imdbRating != null ? imdbRating.toFixed(1) : '';
+    const imdbVotes = imdbRating != null ? Number(imdbInfo.votes) || 0 : 0;
+    const votesTxt = imdbVotes ? ' · ' + numFmt.format(imdbVotes) + ' votos' : '';
+    let badge = '';
+    if (imdbScore) {
       badge = '<span class="badge badge-main imdb" data-score="' + id + '" data-tmdb="' + tmdbScore + '"' +
         ' title="IMDb ' + imdbScore + votesTxt + (tmdbScore ? ' · TMDb ' + tmdbScore : '') + '">IMDb ' + imdbScore + '</span>';
     } else if (tmdbScore) {
@@ -1967,6 +2039,7 @@ try {
         seeded: !!imdbPool.seeded,
         seededAt: Number(imdbPool.seededAt) || 0,
         catalog: Number(imdbPool.catalog) || 0,
+        quota: imdbPool.quota || null,
         items: imdbPool.items
       }));
     } catch {}
@@ -1987,6 +2060,7 @@ try {
           seeded: !!p.seeded,
           seededAt: Number(p.seededAt) || 0,
           catalog: Number(p.catalog) || 0,
+          quota: p.quota || null,
           pages: wide
             ? IMDB_LENS_PAGES
             : Math.min(IMDB_NARROW_MAX_PAGES, Math.max(IMDB_NARROW_PAGES, Number(p.pages) || IMDB_NARROW_PAGES))
@@ -2048,6 +2122,10 @@ try {
   // Evita reintentar el catálogo en cada repintado si MDBList rechaza la clave
   // o se queda sin cuota.
   let catalogSeedFailedAt = 0;
+  // La última cuota devuelta por MDBList y el año de la semilla actual, para
+  // mostrarlas en la interfaz sin hacer más consultas.
+  let catalogSeedQuota = null;
+  let catalogSeedYear = '';
 
   function readCatalogCache() {
     if (catalogCache) return catalogCache;
@@ -2127,8 +2205,10 @@ try {
   }
 
   async function fetchImdbCatalogSeed(f, myId) {
-    if (!S.mdblist || !f.year || f.q) return { ok: false, skipped: true };
-    const year = String(f.year);
+    if (!S.mdblist || f.q) return { ok: false, skipped: true };
+    // Sin año exacto se usa el actual: el top semanal de IMDb sirve de semilla
+    // por defecto, sin necesidad de filtrar por año.
+    const year = String(f.year || new Date().getFullYear());
     const store = readCatalogCache();
     const hit = store[year];
     if (hit && Array.isArray(hit.items) && Date.now() - (hit.ts || 0) < IMDB_CATALOG_TTL) {
@@ -2152,6 +2232,7 @@ try {
     let scanned = 0;
     let pages = 0;
     let partial = false;
+    let quota = null;
 
     for (let p = 1; p <= IMDB_CATALOG_PAGES; p++) {
       if (myId !== state.reqId) return null;
@@ -2173,6 +2254,7 @@ try {
         partial = true;
         break;
       }
+      if (data && data.quota) quota = data.quota;
       pages++;
       const movies = (data && data.movies) || [];
       scanned += movies.length;
@@ -2187,10 +2269,10 @@ try {
       cursor = next;
     }
 
-    if (!items.length) return { ok: false, reason: 'empty', scanned, pages };
-    store[year] = { ts: Date.now(), items, scanned, pages, partial };
+    if (!items.length) return { ok: false, reason: 'empty', scanned, pages, quota };
+    store[year] = { ts: Date.now(), items, scanned, pages, partial, quota };
     saveCatalogCache();
-    return { ok: true, items: filterCatalogSeed(items, f), scanned, pages, partial };
+    return { ok: true, items: filterCatalogSeed(items, f), scanned, pages, partial, quota };
   }
 
   /** Fusiona la semilla con el bloque de TMDb sin duplicar IDs. */
@@ -2509,7 +2591,7 @@ try {
     let seedFailed = false;
     let seedReason = '';
     let seedPartial = false;
-    const wantsSeed = wide && !!f.year && !f.q && !!S.mdblist;
+    const wantsSeed = wide && !f.q && !!S.mdblist;
 
     if (imdbPool.sig === sig && imdbPool.items.length) {
       pool = imdbPool.items.slice();
@@ -2569,9 +2651,14 @@ try {
         if (seed.ok) {
           seeded = true;
           seedPartial = !!seed.partial;
+          if (seed.quota) catalogSeedQuota = seed.quota;
+          catalogSeedYear = String(f.year || new Date().getFullYear());
           if (seed.items.length) {
             applyCatalogRatings(seed.items);
             pool = mergeCatalogPool(pool, seed.items);
+            // Pintado progresivo: las sembradas ya tienen nota y votos, así que
+            // se muestran ahora sin esperar a OMDb.
+            renderRankSlice(pool, f, myId, false);
           }
         } else if (!seed.skipped) {
           seedFailed = true;
@@ -2624,7 +2711,9 @@ try {
         seeded,
         seededAt: seeded ? Date.now() : 0,
         catalog: catalogCount(pool),
-        checked: pool.filter((m) => imdbChecked(m.id)).length
+        checked: pool.filter((m) => imdbChecked(m.id)).length,
+        quota: catalogSeedQuota,
+        seedYear: catalogSeedYear
       };
       saveRankPool();
     }
