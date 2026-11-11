@@ -27,6 +27,8 @@ try {
     --text: #e9ecf1; --dim: #98a2b3;
     --accent: #f5c518; --danger: #ff5c6c; --ok: #35d07f;
     --tmdb: #01b4e4; --trakt: #ed1c24; --imdb: #f5c518; --heart: #ff4d6d;
+    /* Texto de enlaces/auxiliares: el cian puro no llega a contraste en claro. */
+    --tmdb-ink: #01b4e4; --aux: #01b4e4;
     --radius: 14px; --radius-sm: 10px;
     --shadow: 0 18px 45px rgba(0,0,0,.45);
     --ring: 0 0 0 3px rgba(245,197,24,.28);
@@ -38,6 +40,7 @@ try {
     --border: #d7dce6; --border-soft: #e4e8f0;
     --text: #101521; --dim: #5b6474;
     --danger: #d92b45; --ok: #0f9d58;
+    --tmdb-ink: #00708c; --aux: #00708c;
     --shadow: 0 18px 40px rgba(16,21,33,.12);
     --sticky-bg: rgba(255,255,255,.88);
     color-scheme: light;
@@ -114,7 +117,7 @@ try {
   .trakt-bar.err .dot { background: var(--danger); }
   .trakt-bar .spacer { flex: 1; }
   .link-btn {
-    background: none; border: none; color: var(--accent); cursor: pointer;
+    background: none; border: none; color: var(--tmdb-ink); cursor: pointer;
     font-size: .82rem; font-weight: 700; padding: 4px 6px; border-radius: 6px;
   }
   .link-btn:hover { text-decoration: underline; }
@@ -176,7 +179,10 @@ try {
   }
   .pill input { position: absolute; opacity: 0; pointer-events: none; }
   .pill:hover { border-color: var(--dim); }
-  .pill:has(input:checked) { background: rgba(245,197,24,.1); border-color: var(--accent); color: var(--accent); }
+  .pill:has(input:checked) {
+    background: rgba(1,180,228,.12); border-color: var(--tmdb);
+    color: var(--tmdb-ink);
+  }
   .pill.trakt:has(input:checked) { background: rgba(237,28,36,.12); border-color: var(--trakt); color: var(--trakt); }
   .pill:has(input:disabled) { opacity: .45; cursor: not-allowed; }
   .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
@@ -197,10 +203,27 @@ try {
   .aux-line {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     flex-wrap: wrap; min-height: 20px; padding: 0 8px;
-    font-size: .78rem; color: var(--tmdb); text-align: center;
+    font-size: .78rem; color: var(--aux); text-align: center;
   }
   .aux-line:empty { display: none; }
   .aux-line.error { color: var(--danger); }
+  .aux-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+    background: var(--surface-2); border: 1px solid var(--border-soft);
+    color: var(--dim); font-size: .72rem; font-weight: 600; line-height: 1.55;
+  }
+  .aux-chip.seed {
+    color: #f5c518; border-color: rgba(245,197,24,.4); background: rgba(245,197,24,.09);
+  }
+  html[data-theme="light"] .aux-chip.seed { color: #7a5a00; background: rgba(245,197,24,.16); }
+  .aux-chip.quota {
+    color: var(--ok); border-color: rgba(53,208,127,.38); background: rgba(53,208,127,.09);
+  }
+  html[data-theme="light"] .aux-chip.quota { color: #0b7a45; }
+  .aux-chip.warn {
+    color: var(--danger); border-color: rgba(255,92,108,.4); background: rgba(255,92,108,.09);
+  }
   .spinner {
     width: 16px; height: 16px; border-radius: 50%;
     border: 2px solid var(--border); border-top-color: var(--accent);
@@ -220,14 +243,28 @@ try {
     background: var(--surface); border: 1px solid var(--border-soft);
     border-radius: var(--radius); overflow: hidden;
     cursor: pointer; transition: transform .18s, border-color .18s, box-shadow .18s;
-    animation: rise .22s ease-out both;
     /* Las tarjetas fuera de pantalla no se pintan hasta que hacen falta. */
     content-visibility: auto; contain-intrinsic-size: auto 350px;
+  }
+  /* Solo la primera pintada entra escalonada; paginar o filtrar no reanima. */
+  .grid.animate-in .card {
+    animation: rise .24s ease-out both;
+    animation-delay: calc(var(--i, 0) * 28ms);
   }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .card:hover, .card:focus-visible { transform: translateY(-4px); border-color: var(--accent); box-shadow: var(--shadow); }
   .poster { position: relative; aspect-ratio: 2 / 3; background: var(--surface-2); overflow: hidden; }
-  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .poster img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform .4s cubic-bezier(.2,.7,.3,1);
+  }
+  .card:hover .poster img, .card:focus-visible .poster img { transform: scale(1.045); }
+  .poster::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 44%;
+    background: linear-gradient(0deg, rgba(0,0,0,.58), rgba(0,0,0,0));
+    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 1;
+  }
+  .card:hover .poster::after, .card:focus-visible .poster::after { opacity: 1; }
   .no-poster {
     height: 100%; display: flex; align-items: center; justify-content: center;
     color: var(--dim); font-size: .8rem; text-align: center; padding: 10px;
@@ -236,7 +273,7 @@ try {
   .badge {
     position: absolute; top: 8px; padding: 3px 8px; border-radius: 999px;
     font-size: .7rem; font-weight: 800; line-height: 1.35;
-    background: rgba(0,0,0,.78); color: #fff;
+    background: rgba(0,0,0,.78); color: #fff; z-index: 2;
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   }
   .badge-main { right: 8px; }
@@ -255,7 +292,7 @@ try {
   }
   .fav:hover { transform: scale(1.12); background: rgba(255,77,109,.85); }
   .fav.on { color: var(--heart); background: rgba(0,0,0,.7); border-color: var(--heart); }
-  .trakt-flags { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .trakt-flags { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 4px; flex-wrap: wrap; z-index: 2; }
   .flag {
     padding: 2px 7px; border-radius: 999px; font-size: .64rem; font-weight: 800;
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
@@ -265,7 +302,7 @@ try {
   .hover {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,.15));
-    opacity: 0; transition: opacity .18s; pointer-events: none;
+    opacity: 0; transition: opacity .18s; pointer-events: none; z-index: 2;
   }
   .hover span {
     background: rgba(255,255,255,.94); color: #111; font-weight: 700; font-size: .78rem;
@@ -344,6 +381,12 @@ try {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(180deg, rgba(8,10,14,.35) 0%, rgba(8,10,14,.82) 55%, var(--surface) 100%);
   }
+  /* En tema claro el héroe sigue siendo una banda oscura: si el degradado
+     termina en blanco, el texto blanco de la ficha se pierde. */
+  html[data-theme="light"] .hero::before {
+    background: linear-gradient(180deg, rgba(8,10,14,.32) 0%, rgba(8,10,14,.78) 55%, rgba(8,10,14,.92) 100%);
+  }
+  html[data-theme="light"] .hero { border-bottom: 1px solid var(--border); }
   .hero > * { position: relative; z-index: 2; }
   .hero-poster {
     width: 118px; flex: 0 0 auto; aspect-ratio: 2 / 3; border-radius: 10px; overflow: hidden;
@@ -1495,6 +1538,20 @@ try {
     node.className = 'aux-line ' + kind;
     node.textContent = text || '';
   }
+  /** Auxiliar compacto: chips con tooltip en vez de una frase larga. */
+  function setAuxChips(parts) {
+    const node = $('aux');
+    node.className = 'aux-line';
+    node.textContent = '';
+    (parts || []).forEach((p) => {
+      if (!p || !p.text) return;
+      const chip = document.createElement('span');
+      chip.className = 'aux-chip' + (p.kind ? ' ' + p.kind : '');
+      chip.textContent = p.text;
+      if (p.title) chip.title = p.title;
+      node.appendChild(chip);
+    });
+  }
   function setBusy(busy) {
     state.loading = busy;
     $('status').classList.toggle('busy', busy);
@@ -1777,7 +1834,7 @@ try {
 
     const meta = [year || '—', imdbScore && tmdbScore ? 'TMDb ' + tmdbScore : ''].filter(Boolean).join(' · ');
 
-    return '<article class="card" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr(title) + '">' +
+    return '<article class="card" style="--i:' + Math.min(index, 7) + '" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr(title) + '">' +
       '<div class="poster">' +
         (poster
           ? '<img src="' + poster + '"' + (srcset ? ' srcset="' + srcset + '" sizes="(max-width: 520px) 44vw, (max-width: 900px) 30vw, 210px"' : '') +
@@ -1800,12 +1857,19 @@ try {
     '</article>';
   }
 
+  let gridPainted = false;
   function renderGrid(list, emptyMsg) {
     const grid = $('movieGrid');
     if (!list.length) {
+      grid.classList.remove('animate-in');
       grid.innerHTML = '<div class="empty"><span class="big">🍿</span><p>' + esc(emptyMsg || 'No hay resultados con estos filtros.') + '</p></div>';
       return;
     }
+    // La entrada escalonada solo se ve en la primera pintada: al paginar o
+    // filtrar, la rejilla cambia sin volver a animar todas las tarjetas.
+    const animate = !gridPainted;
+    gridPainted = true;
+    grid.classList.toggle('animate-in', animate);
     const html = list.map((m, i) => { rememberMovie(m); return cardHtml(m, i); }).join('');
     grid.innerHTML = html;
   }
@@ -2768,12 +2832,14 @@ try {
       : '';
     const catalog = catalogCount(pool);
     const omdbConsulted = Math.max(0, consulted - catalog);
-    const quotaTxt = (catalogSeedQuota && catalogSeedQuota.limit)
-      ? ' Top IMDb: quedan ' + catalogSeedQuota.remaining + ' de ' + catalogSeedQuota.limit + ' consultas esta semana.'
+    const quotaLeft = catalogSeedQuota && catalogSeedQuota.limit ? catalogSeedQuota : null;
+    const quotaTxt = quotaLeft
+      ? ' Top IMDb: quedan ' + quotaLeft.remaining + ' de ' + quotaLeft.limit + ' consultas esta semana.'
       : '';
-    const seedHint = (!f.year && !f.q && S.mdblist)
-      ? ' Semilla: top de IMDb de ' + (catalogSeedYear || new Date().getFullYear()) + '.' + quotaTxt
-      : quotaTxt;
+    const seedYear = (!f.year && !f.q && S.mdblist)
+      ? String(catalogSeedYear || new Date().getFullYear())
+      : '';
+    const seedHint = seedYear ? ' Semilla: top de IMDb de ' + seedYear + '.' + quotaTxt : quotaTxt;
     if (fatal) {
       setAux('OMDb rechazó la clave o se agotó el límite diario: el ranking se completa con las notas ya guardadas.', 'error');
     } else if (preFailed) {
@@ -2790,11 +2856,36 @@ try {
             : 'no se pudo cargar el top semanal de IMDb';
       setAux(why + ': el ranking sigue con las candidatas de TMDb.' + reliability, 'warn');
     } else if (wide) {
-      setAux('Bloque de ' + plural(pool.length, 'candidata', 'candidatas') +
-        (catalog ? ' · ' + catalog + ' del top semanal de IMDb' : '') +
-        ' · ' + plural(omdbConsulted, 'consultada', 'consultadas') + ' en OMDb' +
-        (unverified ? '; quedan ' + unverified + ' por verificar.' : '.') +
-        (seedPartial ? ' Top semanal parcial.' : '') + reliability + seedHint);
+      const chips = [{ text: plural(pool.length, 'candidata', 'candidatas'),
+        title: 'Candidatas de TMDb que forman el bloque del ranking' }];
+      if (catalog) {
+        chips.push({ text: '★ Top IMDb · ' + catalog, kind: 'seed',
+          title: 'Notas IMDb del top semanal de MDBList' });
+      }
+      chips.push({ text: 'OMDb ' + omdbConsulted,
+        title: plural(omdbConsulted, 'nota consultada', 'notas consultadas') + ' a OMDb' });
+      if (unverified) {
+        chips.push({ text: unverified + ' por verificar',
+          title: 'Candidatas de este bloque sin nota IMDb verificada' });
+      }
+      if (seedPartial) {
+        chips.push({ text: 'Top parcial', kind: 'warn',
+          title: 'El top semanal de IMDb llegó incompleto' });
+      }
+      if (excluded) {
+        chips.push({ text: '≥ ' + IMDB_RANK_MIN_VOTES + ' votos IMDb',
+          title: plural(excluded, 'candidata descartada', 'candidatas descartadas') +
+            ' por no tener ' + IMDB_RANK_MIN_VOTES + ' votos en IMDb' });
+      }
+      if (seedYear) {
+        chips.push({ text: 'Semilla ' + seedYear, kind: 'seed',
+          title: 'El ranking arranca con el top de IMDb de ' + seedYear });
+      }
+      if (quotaLeft) {
+        chips.push({ text: 'Cuota ' + quotaLeft.remaining + '/' + quotaLeft.limit, kind: 'quota',
+          title: 'Consultas de MDBList disponibles esta semana' });
+      }
+      setAuxChips(chips);
     } else if (sourceTotal && sourceTotal > pool.length) {
       setAux((pages >= IMDB_NARROW_MAX_PAGES
         ? 'Ranking calculado sobre las ' + (IMDB_NARROW_MAX_PAGES * IMDB_LENS_COUNT * IMDB_PAGE_SIZE) +
