@@ -450,22 +450,41 @@ try {
   .person-head h2 { font-size: 1.25rem; color: #fff; line-height: 1.2; }
   .person-head .meta { font-size: .8rem; color: rgba(255,255,255,.7); margin-top: 4px; }
   .person-back { margin-bottom: 14px; }
-  .film-list { display: flex; flex-direction: column; gap: 2px; }
-  .film-row {
-    display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px;
-    align-items: center; width: 100%; padding: 5px 6px; border: 0; border-radius: 8px;
-    background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  .film-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 16px 12px;
   }
-  .film-row:hover { background: var(--surface-2); }
+  .film-row {
+    display: flex; flex-direction: column; gap: 7px; width: 100%; min-width: 0;
+    padding: 0; border: 0; border-radius: 10px; background: none;
+    color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  }
+  .film-row .poster { position: relative; display: block; }
   .film-row img, .film-row .ph {
-    width: 38px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px;
+    width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px;
     background: var(--surface-2); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
-    font-size: .58rem; color: var(--dim);
+    font-size: .68rem; color: var(--dim);
   }
-  .film-row .t { font-size: .8rem; line-height: 1.3; }
-  .film-row .c { display: block; font-size: .68rem; color: var(--dim); }
-  .film-row .y { font-size: .72rem; color: var(--dim); }
+  .film-row:hover img, .film-row:hover .ph,
+  .film-row:focus-visible img, .film-row:focus-visible .ph { border-color: var(--accent); }
+  .film-row .info { min-width: 0; }
+  .film-row .t {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; font-size: .78rem; line-height: 1.3;
+  }
+  .film-row:hover .t { color: #fff; }
+  .film-row .c {
+    display: block; font-size: .68rem; color: var(--dim); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .film-row .y {
+    position: absolute; top: 6px; right: 6px;
+    padding: 2px 6px; border-radius: 999px;
+    font-size: .62rem; font-weight: 700; color: #fff;
+    background: rgba(0,0,0,.72);
+    font-variant-numeric: tabular-nums;
+  }
 
   .providers { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .provider {
@@ -550,6 +569,7 @@ try {
     .hero { flex-direction: column; align-items: flex-start; }
     .hero-poster { width: 86px; }
     .pills-row .push { margin-left: 0; width: 100%; }
+    .film-list { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 14px 10px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
@@ -3023,12 +3043,15 @@ try {
           const year = (c.release_date || '').slice(0, 4);
           return '<button class="film-row" type="button" data-similar="' + Number(c.id) + '"' +
             ' aria-label="Abrir ' + escapeAttr(c.title || '') + '">' +
-            (poster
-              ? '<img src="' + poster + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="92" height="138">'
-              : '<span class="ph">—</span>') +
-            '<span><span class="t">' + esc(c.title || 'Sin título') + '</span>' +
+            '<span class="poster">' +
+              (poster
+                ? '<img src="' + poster + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="92" height="138">'
+                : '<span class="ph">—</span>') +
+              (year ? '<span class="y">' + esc(year) + '</span>' : '') +
+            '</span>' +
+            '<span class="info"><span class="t">' + esc(c.title || 'Sin título') + '</span>' +
               (c.character ? '<span class="c">' + esc(c.character) + '</span>' : '') + '</span>' +
-            '<span class="y">' + esc(year || '') + '</span></button>';
+            '</button>';
         }).join('')
       : '<p class="providers-note">Sin películas registradas.</p>';
 
