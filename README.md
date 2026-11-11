@@ -4,7 +4,7 @@ App de un solo archivo para explorar películas con **TMDb**, filtrar, guardar u
 **watchlist local** y sincronizar tus **vistas y notas de Trakt**. Sin backend, sin
 proxies y sin subir tus claves a ningún servidor.
 
-- **Archivo:** `index.html` (octubre 2026). Se abre con doble clic; no requiere instalar nada.
+- **Archivo:** `index.html` (noviembre 2026). Se abre con doble clic; no requiere instalar nada.
 - **Referencia:** `original-v9.html` es la versión que salió del chat de DeepSeek, sin tocar.
 - **Fragmento suelto:** el `deepseek_javascript_*.js` era un trozo de esta app que usaba
   `corsproxy.io`; se descartó (ver *Seguridad*).
@@ -19,7 +19,8 @@ proxies y sin subir tus claves a ningún servidor.
    - v4: *Read Access Token* (`eyJ…`) → viaja en la cabecera `Authorization` (mejor).
 3. Opcional: añade OMDb, MDBList y Trakt desde el mismo panel. OMDb es necesario para
    el ranking IMDb; **MDBList es muy recomendable** porque multiplica por cuatro el bloque
-   de candidatas que se puede ordenar por nota IMDb.
+   de candidatas que se puede ordenar por nota IMDb y **siembra el ranking con el top semanal
+   real de IMDb** del año elegido.
 
 | Servicio | Para qué | Dónde se obtiene |
 |---|---|---|
@@ -87,6 +88,8 @@ proxies y sin subir tus claves a ningún servidor.
   y reinicios**: al reabrir la app, catálogo, detalles, similares y filmografías salen de caché.
   TTL por tipo de dato: géneros 7 días, listados 10 min, detalles 24 h, puntuaciones 12 h,
   Trakt 30 min, IMDb 6 h (y **30 min** para notas con menos de 500 votos, que cambian rápido).
+  El **top semanal de IMDb** (catálogo de MDBList) se guarda **7 días por año**: se consulta una
+  vez a la semana y el resto de cargas lo reutilizan sin gastar cuota.
 - **Purga automática**: al pasar de 400 entradas se eliminan las expiradas y la mitad más
   antigua. La caché antigua de `sessionStorage` se migra sola a IndexedDB.
 - **Imágenes adaptativas**: `srcset` con `w185`, `w342` y `w500` más `sizes`, de modo que un
@@ -132,18 +135,29 @@ proxies y sin subir tus claves a ningún servidor.
   consultas distintas —lo **más popular**, lo **mejor valorado** (≥ 1.000 votos TMDb) y lo
   **más votado**— y se deduplica. Sin MDBList son 60 candidatas; con MDBList, 4 páginas por
   lente hasta **240**.
+- **Semilla del top semanal de IMDb**: cuando hay año exacto, MDBList y OMDb, el ranking se
+  siembra con el catálogo `GET /catalog/movie?sort=imdbrating` de MDBList —el **top real de IMDb
+  de ese año**— con 8 páginas de 100 títulos y un suelo de **10.000 votos IMDb**. Esos títulos
+  llegan con nota y votos verificados, entran como `source:'catalog'` y **no gastan OMDb**; se
+  filtran en local por género, exclusiones, año y votos, y se ordenan con el resto por nota
+  IMDb. Así aparecen películas que TMDb no conoce (por ejemplo, estrenos con 30.000 votos en
+  IMDb y solo 104 en TMDb). Si la consulta falla por cuota, clave o red, el ranking continúa
+  con las candidatas de TMDb y lo avisa; nunca se rompe. La consulta del catálogo consume
+  **1 de las 4 consultas gratuitas cada 7 días** y la caché evita repetirla; la paginación por
+  cursor no consume cuota adicional.
 - **Preanálisis con MDBList**: cuando hay clave de MDBList y de OMDb, se piden las notas IMDb
   de las 240 candidatas en lotes de 10 (`POST /rating/movie/imdb`), sin gastar OMDb. Esas notas
   no se muestran: solo ordenan la cola de verificación para que OMDb confirme primero las que
   más probabilidades tienen de ser fiables. Si MDBList falla (clave inválida, sin red), el
   bloque se recorta a 60 candidatas y se avisa; el ranking nunca se rompe.
-- **Solo notas fiables**: solo entran en el ranking las notas que OMDb devuelve **por el
-  `imdb_id` de TMDb** y con **al menos 500 votos** en IMDb. Las demás (estrenos recién
-  publicados, títulos que solo coinciden por nombre o con nota inflada por pocos votos) no
-  aparecen en la lista y se cuentan como «sin nota fiable». Es lo que evita que un estreno de
-  2026 con 120 votos se cuele como «mejor película». Si **ninguna** candidata supera ese
-  criterio, la app no disfraza el orden de TMDb: deja la rejilla con un aviso y el botón para
-  verificar más candidatas, en lugar de mostrar una lista que parezca un ranking.
+- **Solo notas fiables**: solo entran en el ranking las notas **verificadas** —las de OMDb
+  devueltas por el `imdb_id` de TMDb o las del top semanal de IMDb, que ya traen sus votos— y
+  con **al menos 500 votos** en IMDb. Las demás (estrenos recién publicados, títulos que solo
+  coinciden por nombre o con nota inflada por pocos votos) no aparecen en la lista y se cuentan
+  como «sin nota fiable». Es lo que evita que un estreno de 2026 con 120 votos se cuele como
+  «mejor película». Si **ninguna** candidata supera ese criterio, la app no disfraza el orden de
+  TMDb: deja la rejilla con un aviso y el botón para verificar más candidatas, en lugar de
+  mostrar una lista que parezca un ranking.
 - **«Solo no vistas»**: oculta las películas que ya figuran en tu historial de Trakt. Se aplica
   al pintar, sin volver a pedir datos, así que se puede activar y desactivar al instante; el
   contador indica cuántas se han ocultado.
@@ -198,20 +212,24 @@ proxies y sin subir tus claves a ningún servidor.
   media, popularidad, fecha…). El orden por IMDb se calcula en local sobre un bloque de
   **60 candidatas sin MDBList (ampliable a 180) o 240 con MDBList**, reunidas con tres lentes
   (más populares, mejor valoradas y más votadas) que cumplen los filtros y tienen al menos
-  **100 votos** en TMDb. Para entrar en el ranking, la nota debe venir del `imdb_id` de TMDb y
-  tener **≥ 500 votos en IMDb**; el resto se descarta y se cuenta aparte. No es un ranking
-  global de IMDb, sino el de esas 60–240 películas.
-- **MDBList no tiene cuota para su catálogo**: su endpoint `GET /catalog/movie?sort=imdbrating`
-  sí devuelve un ranking IMDb con votos, pero el plan gratuito permite **4 peticiones cada 7
-  días**, así que no sirve como fuente principal. Por eso se usa el lote
-  `POST /rating/movie/imdb` (10 IDs por petición): da la nota sin votos y se gasta cuota de
-  MDBList, no de OMDb; OMDb sigue confirmando los votos. Además, ese lote debe enviarse como
-  formulario (`application/x-www-form-urlencoded`): con JSON, el preflight CORS devuelve 405.
+  **100 votos** en TMDb, **más el top semanal de IMDb** (hasta 800 títulos del año con
+  ≥ 10.000 votos). Para entrar en el ranking, la nota debe venir del `imdb_id` de TMDb o del
+  catálogo de IMDb y tener **≥ 500 votos en IMDb**; el resto se descarta y se cuenta aparte.
+  No es un ranking global de IMDb, sino el de esas candidatas más el top del año.
+- **El catálogo de MDBList tiene cuota**: su endpoint `GET /catalog/movie?sort=imdbrating`
+  devuelve el top semanal de IMDb con votos, pero el plan gratuito permite **4 consultas cada
+  7 días**. Por eso se pide **una vez por año y se guarda 7 días** (8 páginas de 100 títulos
+  mediante cursor, que no consumen cuota extra). Además se usa el lote
+  `POST /rating/movie/imdb` (10 IDs por petición) para preanalizar las candidatas de TMDb: da
+  la nota sin votos y se gasta cuota de MDBList, no de OMDb; OMDb sigue confirmando los votos.
+  Ese lote debe enviarse como formulario (`application/x-www-form-urlencoded`): con JSON, el
+  preflight CORS devuelve 405. Si el catálogo falla, la app sigue con TMDb y avisa.
 - **Coste del ranking en OMDb**: se pide primero el `imdb_id` a TMDb y luego **una sola consulta
   a OMDb por película**. La primera carga con MDBList verifica 120 candidatas; cada pulsación de
   «Verificar 60 más» añade 60 hasta 240. Sin MDBList son ~60 consultas iniciales y hasta 180.
-  Después, 0 mientras la caché siga vigente. Con 1.000 consultas diarias gratuitas da para
-  bastantes tandas.
+  Los títulos del top semanal de IMDb **no gastan OMDb** (ya traen nota y votos) y se descuentan
+  del tope de verificaciones. Después, 0 mientras la caché siga vigente. Con 1.000 consultas
+  diarias gratuitas da para bastantes tandas.
 - **Filtro de nota mínima**: se aplica sobre las candidatas ya reunidas, no sobre todo IMDb. Si
   con 8,0 salen pocas, la app sugiere bajar la nota o verificar más candidatas.
 - TMDb no devuelve más de **500 páginas** (10.000 resultados) por búsqueda.
@@ -262,6 +280,29 @@ cinecatalogo/
   recortó a 60 candidatas y apareció «MDBList no respondió: el ranking se calcula con las 60
   primeras candidatas»; el botón volvió a «＋ Añadir 60 candidatas» y el ranking siguió
   funcionando.
+- **Semilla del top semanal de IMDb (flujo completo, API simulada)**: 8 peticiones al catálogo
+  (100 títulos cada una), 24 lotes de MDBList, 12 `discover`, 60 OMDb y 60 `external_ids`.
+  Resultado: «69 películas ordenadas por nota IMDb · 180 sin verificar», con las tarjetas
+  sembradas arriba (You Can See Everything 9,1; Baththa 8,6) y la nota «9 del top semanal de
+  IMDb · 60 consultadas en OMDb». La entrada de 9,9 con **100 votos** quedó fuera por el suelo
+  de fiabilidad. Las 9 sembradas se guardaron como `source:'catalog'` en `cine.imdb.v3` y el
+  catálogo completo del año en `cine.imdb.catalog.v1`; ninguna de ellas lanzó una consulta a
+  OMDb.
+- **Caché semanal de la semilla**: segunda carga en el mismo perfil con el ranking reiniciado →
+  **0 peticiones al catálogo**, 9 sembradas reutilizadas y el ranking siguió creciendo con las
+  notas ya guardadas (129 ordenadas). Cambiar a `year=2025` consultó de nuevo con
+  `year_min=2025` y guardó su propia entrada anual, sin mezclar años.
+- **Fallos del catálogo**: con 401 apareció «MDBList rechazó la clave: el ranking sigue con las
+  candidatas de TMDb», 0 entradas sembradas y 60 candidatas ordenadas; con 429, «MDBList agotó
+  su cuota semanal» y el mismo fallback. En ningún caso se rompió el ranking.
+- **Género y semilla**: con `genre=9648` (Misterio) solo sobrevivió la sembrada de ese género
+  (1 del top semanal, Baththa descartada) y el bloque bajó a 241 candidatas.
+- **Ficha de una sembrada**: abrir You Can See Everything mostró `IMDb 9.1 · TMDb ★ 8.0` y **no
+  añadió ninguna consulta a OMDb** (60 antes y después), porque la entrada del catálogo seguía
+  vigente; sí cargó MDBList y recomendaciones.
+- **Nota divergente en la ficha**: con una nota vieja de 8,9 en caché y 7,4 real en OMDb, al
+  abrir la ficha la cabecera mostró 7,4, **la tarjeta cambió a 7,4** y la entrada de
+  `cine.imdb.v3` quedó actualizada con sus votos (1 consulta OMDb, la esperada).
 - **Sin clave de MDBList**: 60 candidatas, **0 lotes**, 40 consultas OMDb y ampliación a 120
   correcta (la lente de mejor valoradas exige 1.000 votos TMDb).
 - **Estado vacío del modo amplio**: con todas las candidatas por debajo de 500 votos, 0
